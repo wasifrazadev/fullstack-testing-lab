@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import todoService from "../services/todoService";
+import { checkBackendHealth } from "../services/healthService";
 
 export default function Todo() {
   const [todos, setTodos] = useState([]);
@@ -10,6 +11,32 @@ export default function Todo() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [backend, setBackend] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState("checking");
+
+  useEffect(() => {
+    let active = true;
+
+    checkBackendHealth()
+      .then((data) => {
+        if (active && data.status === "ok") {
+          setBackend(data);
+          setConnectionStatus("connected");
+        } else if (active) {
+          setConnectionStatus("disconnected");
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setBackend(null);
+          setConnectionStatus("disconnected");
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const getErrorMessage = (err) =>
     err.response?.data?.message || err.message || "Something went wrong.";
@@ -61,9 +88,7 @@ export default function Todo() {
         const updated = await todoService.update(editingId, payload);
 
         setTodos((current) =>
-          current.map((todo) =>
-            todo.id === editingId ? updated : todo
-          )
+          current.map((todo) => (todo.id === editingId ? updated : todo)),
         );
       } else {
         const created = await todoService.create(payload);
@@ -98,9 +123,7 @@ export default function Todo() {
       });
 
       setTodos((current) =>
-        current.map((item) =>
-          item.id === todo.id ? updated : item
-        )
+        current.map((item) => (item.id === todo.id ? updated : item)),
       );
     } catch (err) {
       setError(getErrorMessage(err));
@@ -117,9 +140,7 @@ export default function Todo() {
     try {
       await todoService.delete(id);
 
-      setTodos((current) =>
-        current.filter((todo) => todo.id !== id)
-      );
+      setTodos((current) => current.filter((todo) => todo.id !== id));
 
       if (editingId === id) {
         resetForm();
@@ -129,9 +150,7 @@ export default function Todo() {
     }
   }
 
-  const completedCount = todos.filter(
-    (todo) => Boolean(todo.completed)
-  ).length;
+  const completedCount = todos.filter((todo) => Boolean(todo.completed)).length;
 
   const activeCount = todos.length - completedCount;
 
@@ -150,24 +169,40 @@ export default function Todo() {
         <header className="topbar">
           <a className="brand" href="#" aria-label="Taskflow home">
             <span className="brand-icon">✓</span>
-            <span>taskflow<span className="brand-dot">.</span></span>
+            <span>
+              taskflow<span className="brand-dot">.</span>
+            </span>
           </a>
 
           <span className="environment-badge">
-            <span className="status-dot" />
-            CRUD Playground
+            <div className="backend-status">
+              {connectionStatus === "checking" && (
+                <span>Checking backend...</span>
+              )}
+
+              {connectionStatus === "connected" && (
+                <span>
+                  🟢 Connected: {backend.backend} · Port {backend.port}
+                </span>
+              )}
+
+              {connectionStatus === "disconnected" && (
+                <span>🔴 Not Connected</span>
+              )}
+            </div>
           </span>
         </header>
 
         <section className="hero">
           <p className="eyebrow">YOUR PERSONAL WORKSPACE</p>
           <h1>
-            Make room for<br />
+            Make room for
+            <br />
             <span>what matters.</span>
           </h1>
           <p className="hero-copy">
-            Small steps, big progress. Keep your tasks organized
-            and get things done, one at a time.
+            Small steps, big progress. Keep your tasks organized and get things
+            done, one at a time.
           </p>
         </section>
 
@@ -300,9 +335,7 @@ export default function Todo() {
                 {filter === "completed" ? "✓" : "✦"}
               </span>
               <h3>
-                {todos.length === 0
-                  ? "A fresh start."
-                  : "Nothing here yet."}
+                {todos.length === 0 ? "A fresh start." : "Nothing here yet."}
               </h3>
               <p>
                 {todos.length === 0
@@ -321,9 +354,7 @@ export default function Todo() {
                 >
                   <button
                     type="button"
-                    className={`task-check ${
-                      todo.completed ? "checked" : ""
-                    }`}
+                    className={`task-check ${todo.completed ? "checked" : ""}`}
                     aria-label={
                       todo.completed ? "Mark as active" : "Mark as completed"
                     }
@@ -338,9 +369,7 @@ export default function Todo() {
                     {todo.description && <p>{todo.description}</p>}
 
                     <span
-                      className={`task-status ${
-                        todo.completed ? "done" : ""
-                      }`}
+                      className={`task-status ${todo.completed ? "done" : ""}`}
                     >
                       <span />
                       {todo.completed ? "Completed" : "In progress"}

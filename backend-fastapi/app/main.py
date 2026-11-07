@@ -21,8 +21,12 @@ app.add_middleware(
 
 
 @app.get("/api/health")
-def health_check():
-    return {"status": "ok"}
+def health():
+    return {
+        "status": "ok",
+        "backend": "FastAPI",
+        "port": int(os.getenv("PORT", 5000)),
+    }
 
 
 app.include_router(todos.router, prefix="/api")

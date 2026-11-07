@@ -5,7 +5,7 @@ const cors = require("cors");
 const pool = require("./db");
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors({
   origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173",
@@ -25,7 +25,8 @@ function formatTodo(todo) {
 app.get("/api/health", (req, res) => {
   res.json({
     status: "ok",
-    message: "Todo API is running",
+    backend: "Node.js",
+    port: Number(PORT),
   });
 });
 

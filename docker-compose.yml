@@ -1,32 +1,108 @@
 services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-todo_testing}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db.sql:/docker-entrypoint-initdb.d/01-db.sql:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
   node-api:
     build: ./backend-node
+    restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "3000:3000"
     env_file:
       - ./backend-node/.env
     environment:
-      PORT: "5000"
-      DB_HOST: host.docker.internal
+      PORT: "3000"
+      DB_HOST: mysql
       DB_PORT: "3306"
+      DB_NAME: ${MYSQL_DATABASE:-todo_testing}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
       FRONTEND_ORIGIN: http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
 
   fastapi-api:
     build: ./backend-fastapi
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "5000:8000"
     env_file:
       - ./backend-fastapi/.env
     environment:
       PORT: "8000"
-      DB_HOST: host.docker.internal
+      DB_HOST: mysql
       DB_PORT: "3306"
+      DB_NAME: ${MYSQL_DATABASE:-todo_testing}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
       FRONTEND_ORIGIN: http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  laravel-api:
+    build: ./backend-laravel
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend-laravel/.env
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: ${LARAVEL_APP_KEY}
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: ${MYSQL_DATABASE:-todo_testing}
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      FRONTEND_ORIGIN: http://localhost:5173
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
 
   frontend:
     build:
       context: ./frontend
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
     ports:
       - "5173:80"
+    depends_on:
+      - node-api
+      - fastapi-api
+      - laravel-api
+    networks:
+      - app-network
+
+volumes:
+  mysql_data:
+
+networks:
+  app-network:
+    driver: bridge
