@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import todoService from "../services/todoService";
-import { checkBackendHealth } from "../services/healthService";
+import BackendConnection from "../components/BackendConnection";
 
 export default function Todo() {
   const [todos, setTodos] = useState([]);
@@ -11,32 +11,6 @@ export default function Todo() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [backend, setBackend] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState("checking");
-
-  useEffect(() => {
-    let active = true;
-
-    checkBackendHealth()
-      .then((data) => {
-        if (active && data.status === "ok") {
-          setBackend(data);
-          setConnectionStatus("connected");
-        } else if (active) {
-          setConnectionStatus("disconnected");
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setBackend(null);
-          setConnectionStatus("disconnected");
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const getErrorMessage = (err) =>
     err.response?.data?.message || err.message || "Something went wrong.";
@@ -54,10 +28,6 @@ export default function Todo() {
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    loadTodos();
-  }, [loadTodos]);
 
   function resetForm() {
     setTitle("");
@@ -160,6 +130,17 @@ export default function Todo() {
     return true;
   });
 
+  function handleBackendChange(data) {
+    setTodos([]);
+    setError("");
+
+    if (data) {
+      loadTodos();
+    } else {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <div className="ambient ambient-one" />
@@ -174,7 +155,8 @@ export default function Todo() {
             </span>
           </a>
 
-          <span className="environment-badge">
+          <BackendConnection onConnectionChange={handleBackendChange} />
+          {/* <span className="environment-badge">
             <div className="backend-status">
               {connectionStatus === "checking" && (
                 <span>Checking backend...</span>
@@ -190,7 +172,7 @@ export default function Todo() {
                 <span>🔴 Not Connected</span>
               )}
             </div>
-          </span>
+          </span> */}
         </header>
 
         <section className="hero">
